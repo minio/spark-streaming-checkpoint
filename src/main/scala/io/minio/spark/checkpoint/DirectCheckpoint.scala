@@ -35,9 +35,10 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   private val SERVER_ENDPOINT = s"fs.s3a.endpoint"
   private val SERVER_REGION = s"fs.s3a.region"
 
-  private val pathStyleAccess = hadoopConfiguration.get(API_PATH_STYLE_ACCESS, "false") == "true"
-  private val endpoint = hadoopConfiguration.get(SERVER_ENDPOINT, "https://s3.amazonaws.com")
+  private val pathStyleAccess = hadoopConfiguration.get(API_PATH_STYLE_ACCESS, "true") == "true"
+  private val endpoint = hadoopConfiguration.get(SERVER_ENDPOINT, "http://127.0.0.1:9000")
   private val location = hadoopConfiguration.get(SERVER_REGION, "us-east-1")
+  println(s"#constructor(${endpoint})")
   private val s3Client =
     AmazonS3ClientBuilder.standard()
       .withCredentials(Credentials.load(hadoopConfiguration))
@@ -46,8 +47,8 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
       .build()
 
   override def list(path: Path, filter: PathFilter): Array[FileStatus] = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    println(s"#list(${path})")
+    var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -59,16 +60,17 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     val objectPos = p.indexOf(Path.SEPARATOR_CHAR)
     val bucketName = p.substring(0, objectPos);
     val prefix = p.substring(objectPos + 1);
+    println(s"#list(${prefix})")
+    println(s"#list(${bucketName})")
 
-    var listVersionsResponse = new VersionListing
+    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)    
     var results = ArrayBuffer[FileStatus]()
+    listVersionsResponse.getVersionSummaries().foreach(s3Version => {
+      results += newFile(s3Version)
+    })
 
-    while (listVersionsResponse == null || listVersionsResponse.isTruncated()) {
-      if (listVersionsResponse == null) {
-        listVersionsResponse = s3Client.listVersions(bucketName, prefix)
-      } else {
-        listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
-      }
+    while (listVersionsResponse.isTruncated()) {
+      listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
       listVersionsResponse.getVersionSummaries().foreach(s3Version => {
         results += newFile(s3Version)
       })
@@ -77,7 +79,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     if (results.isEmpty) {
       throw new FileNotFoundException("Cannot find " + path.toUri())
     }
-    
+
     results.toArray
   }
 
@@ -87,8 +89,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def mkdirs(path: Path): Unit = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    println(s"#mkdirs(${path})")
+
+    var p = path.toString().stripPrefix("s3a://").trim.concat(Path.SEPARATOR)
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -108,8 +111,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def createAtomic(path: Path, overwriteIfPossible: Boolean): CancellableFSDataOutputStream = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    println(s"#createAtomic(${path}, ${overwriteIfPossible})")
+
+    var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -139,8 +143,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def open(path: Path): FSDataInputStream = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    println(s"#open(${path})")
+
+    var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -160,8 +165,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def exists(path: Path): Boolean = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    println(s"#exists(${path})")
+
+    var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -181,12 +187,12 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def delete(path: Path): Unit = {
+    println(s"#delete(${path})")
     deleteObjectsInBucket(path)
   }
 
   def deleteObjectsInBucket(path: Path): Unit = {
-    val uri = path.toUri()
-    var p = uri.getPath()
+    var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
@@ -199,14 +205,17 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     val bucketName = p.substring(0, objectPos)
     val prefix = p.substring(objectPos + 1)
 
-    var listVersionsResponse = new VersionListing
+    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
+    listVersionsResponse.getVersionSummaries().foreach(s3Version => {
+      s3Client.deleteVersion(
+        s3Version.getBucketName(),
+        s3Version.getKey(),
+        s3Version.getVersionId(),
+      )
+    })
 
-    while (listVersionsResponse == null || listVersionsResponse.isTruncated()) {
-      if (listVersionsResponse == null) {
-        listVersionsResponse = s3Client.listVersions(bucketName, prefix)
-      } else {
-        listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
-      }
+    while (listVersionsResponse.isTruncated()) {
+      listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
       listVersionsResponse.getVersionSummaries().foreach(s3Version => {
         s3Client.deleteVersion(
           s3Version.getBucketName(),
@@ -220,6 +229,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   override def isLocal: Boolean = false
 
   override def createCheckpointDirectory(): Path = {
+    println(s"#mkdirs(${path})")
     this.mkdirs(path)
     path
   }  

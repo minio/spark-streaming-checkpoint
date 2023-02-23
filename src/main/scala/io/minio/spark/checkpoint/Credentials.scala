@@ -20,9 +20,11 @@ private[spark] object Credentials {
   }
 
   def load(hadoopConfiguration: Configuration): AWSCredentialsProvider = {
-    val accessKey = hadoopConfiguration.get(s"fs.s3a.access.key", null)
-    val secretKey = hadoopConfiguration.get(s"fs.s3a.secret.key", null)
+    val accessKey = hadoopConfiguration.get(s"fs.s3a.access.key", "minioadmin")
+    val secretKey = hadoopConfiguration.get(s"fs.s3a.secret.key", "minioadmin")
     val sessionToken = hadoopConfiguration.get(s"fs.s3a.session.token", null)
+    println(s"#credentials(${accessKey})")
+    println(s"#credentials(${secretKey})")
     if (accessKey != null && secretKey != null) {
       if (sessionToken != null) {
         Some(staticCredentialsProvider(new BasicSessionCredentials(accessKey, secretKey, sessionToken)))
