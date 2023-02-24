@@ -53,7 +53,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -63,7 +63,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     println(s"#list(${prefix})")
     println(s"#list(${bucketName})")
 
-    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)    
+    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
     var results = ArrayBuffer[FileStatus]()
     listVersionsResponse.getVersionSummaries().foreach(s3Version => {
       results += newFile(s3Version)
@@ -96,7 +96,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -106,7 +106,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     if (objectName.isEmpty()) {
       throw new IllegalArgumentException(path + " is not a valid path for the file system")
     }
-    
+
     s3Client.putObject(bucketName, objectName, "")
   }
 
@@ -118,7 +118,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -150,7 +150,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -160,8 +160,8 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     if (objectName.isEmpty()) {
       throw new IllegalArgumentException(path + " is not a valid path for the file system")
     }
-    
-    new FSDataInputStream(s3Client.getObject(bucketName, objectName).getObjectContent())
+
+    new FSDataInputStream(new S3InputStream(s3Client, bucketName, objectName))
   }
 
   override def exists(path: Path): Boolean = {
@@ -172,7 +172,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -197,7 +197,7 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     // Remove leading SEPARATOR
     if (!p.isEmpty()) {
       if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-	p = p.substring(1)
+        p = p.substring(1)
       }
     }
 
@@ -232,5 +232,5 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     println(s"#mkdirs(${path})")
     this.mkdirs(path)
     path
-  }  
+  }
 }
