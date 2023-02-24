@@ -76,10 +76,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
       })
     }
 
-    if (results.isEmpty) {
-      throw new FileNotFoundException("Cannot find " + path.toUri())
-    }
-
     results.toArray
   }
 
@@ -89,25 +85,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def mkdirs(path: Path): Unit = {
+    // mkdirs() is bogus call, not needed on object
+    // storage avoid it.
     println(s"#mkdirs(${path})")
-
-    var p = path.toString().stripPrefix("s3a://").trim.concat(Path.SEPARATOR)
-
-    // Remove leading SEPARATOR
-    if (!p.isEmpty()) {
-      if (p.charAt(0) == Path.SEPARATOR_CHAR) {
-        p = p.substring(1)
-      }
-    }
-
-    val objectPos = p.indexOf(Path.SEPARATOR_CHAR)
-    val bucketName = p.substring(0, objectPos);
-    val objectName = p.substring(objectPos + 1);
-    if (objectName.isEmpty()) {
-      throw new IllegalArgumentException(path + " is not a valid path for the file system")
-    }
-
-    s3Client.putObject(bucketName, objectName, "")
   }
 
   override def createAtomic(path: Path, overwriteIfPossible: Boolean): CancellableFSDataOutputStream = {
@@ -230,7 +210,8 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
 
   override def createCheckpointDirectory(): Path = {
     println(s"#mkdirs(${path})")
-    this.mkdirs(path)
+    // No need to create the checkpoints folder
+    // this is also another bogus requirement
     path
   }
 }
