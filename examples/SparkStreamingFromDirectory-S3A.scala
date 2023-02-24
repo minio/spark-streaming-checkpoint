@@ -7,7 +7,6 @@ object SparkStreamingFromDirectory {
 
     val spark:SparkSession = SparkSession.builder()
       .appName("SparkByExample")
-      .config("spark.sql.streaming.checkpointFileManagerClass", "io.minio.spark.checkpoint.S3BasedCheckpointFileManager")
       .master("local[1]").getOrCreate()
 
     spark.sparkContext.setLogLevel("ERROR")
