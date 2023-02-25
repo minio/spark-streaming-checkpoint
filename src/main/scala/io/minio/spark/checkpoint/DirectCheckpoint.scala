@@ -1,22 +1,20 @@
+/*
+ * Direct Write Checkpointing (C) 2023 MinIO, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.minio.spark.checkpoint
-
-import scala.collection.JavaConversions._
-import scala.collection.mutable.ArrayBuffer
-
-import java.nio.file.Paths
-import java.nio.file.Files
-import java.net.URI
-import java.io.{FileNotFoundException, OutputStream}
-
-import org.apache.spark.sql.execution.streaming.CheckpointFileManager
-import org.apache.spark.sql.errors.QueryExecutionErrors
-
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs._
-import org.apache.hadoop.fs.local.{LocalFs, RawLocalFs}
-import org.apache.hadoop.fs.permission.FsPermission
-
-import org.apache.spark.sql.execution.streaming.CheckpointFileManager._
 
 // For AmazonS3 client
 import com.amazonaws.services.s3.AmazonS3
@@ -26,6 +24,20 @@ import com.amazonaws.services.s3.model.VersionListing
 import com.amazonaws.services.s3.model.ListVersionsRequest
 import com.amazonaws.services.s3.model.S3VersionSummary
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
+import org.apache.spark.sql.execution.streaming.CheckpointFileManager
+import org.apache.spark.sql.errors.QueryExecutionErrors
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs._
+import org.apache.hadoop.fs.local.{LocalFs, RawLocalFs}
+import org.apache.hadoop.fs.permission.FsPermission
+import org.apache.spark.sql.execution.streaming.CheckpointFileManager._
+import scala.collection.JavaConversions._
+import scala.collection.mutable.ArrayBuffer
+
+import java.nio.file.Paths
+import java.nio.file.Files
+import java.net.URI
+import java.io.{FileNotFoundException, OutputStream}
 
 /** An implementation of [[CheckpointFileManager]] using Native S3 APIs. */
 class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuration)
@@ -38,7 +50,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   private val pathStyleAccess = hadoopConfiguration.get(API_PATH_STYLE_ACCESS, "true") == "true"
   private val endpoint = hadoopConfiguration.get(SERVER_ENDPOINT, "http://127.0.0.1:9000")
   private val location = hadoopConfiguration.get(SERVER_REGION, "us-east-1")
-  println(s"#constructor(${endpoint})")
   private val s3Client =
     AmazonS3ClientBuilder.standard()
       .withCredentials(Credentials.load(hadoopConfiguration))
@@ -47,7 +58,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
       .build()
 
   override def list(path: Path, filter: PathFilter): Array[FileStatus] = {
-    println(s"#list(${path})")
     var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
@@ -60,8 +70,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     val objectPos = p.indexOf(Path.SEPARATOR_CHAR)
     val bucketName = p.substring(0, objectPos);
     val prefix = p.substring(objectPos + 1);
-    println(s"#list(${prefix})")
-    println(s"#list(${bucketName})")
 
     var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
     var results = ArrayBuffer[FileStatus]()
@@ -85,14 +93,11 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def mkdirs(path: Path): Unit = {
-    // mkdirs() is bogus call, not needed on object
-    // storage avoid it.
-    println(s"#mkdirs(${path})")
+    // mkdirs() is bogus call, not needed on object storage avoid it.
+    // this is a no-op.
   }
 
   override def createAtomic(path: Path, overwriteIfPossible: Boolean): CancellableFSDataOutputStream = {
-    println(s"#createAtomic(${path}, ${overwriteIfPossible})")
-
     var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
@@ -123,8 +128,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def open(path: Path): FSDataInputStream = {
-    println(s"#open(${path})")
-
     var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
@@ -145,8 +148,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def exists(path: Path): Boolean = {
-    println(s"#exists(${path})")
-
     var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
@@ -167,7 +168,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def delete(path: Path): Unit = {
-    println(s"#delete(${path})")
     deleteObjectsInBucket(path)
   }
 
@@ -209,9 +209,9 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   override def isLocal: Boolean = false
 
   override def createCheckpointDirectory(): Path = {
-    println(s"#mkdirs(${path})")
     // No need to create the checkpoints folder
-    // this is also another bogus requirement
+    // this is a bogus call, subsequent commit/delta
+    // files automatically create this top level folder.
     path
   }
 }
