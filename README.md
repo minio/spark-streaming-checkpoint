@@ -1,8 +1,6 @@
-# Direct Write Checkpointing
+# Spark Streaming Checkpoint File Manager for MinIO
 
-Safe Structured Streaming for Spark on MinIO with Direct Write Checkpointing. Direct Write Checkpointing for object stores, which ensures correctness as well as performance.
-
-This project extends the [CheckpointFileManager](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/streaming/CheckpointFileManager.scala) abstraction and implements a different checkpoint logic for S3-compatible endpoints (MinIO). In this approach, instead of relying on PUT, COPY, DELETE approach of doing renames(), the taks writes the checkpoint data directly to the final object it intends to.
+This project implements a new [CheckpointFileManager](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/streaming/CheckpointFileManager.scala) a different checkpoint logic for MinIO. In this approach, instead of relying on PUT, COPY, DELETE approach of doing renames(), the task writes the checkpoint data directly to the final object it intends to.
 
 Once writing data to the object is complete, the associated output stream is closed. MinIO guarantees that a object is visible only when the output stream is closed. This way the rename operation is avoided, therefore ensuring there is no file listing call while writing data and no consistency issue. Also, it is more efficient as copying the entire content from one object to another object is also avoided.
 
@@ -18,6 +16,7 @@ object SparkStreamingFromDirectory {
 
     val spark:SparkSession = SparkSession.builder()
       .appName("SparkByExample")
+      .config("spark.sql.streaming.checkpointFileManagerClass", "io.minio.spark.checkpoint.S3BasedCheckpointFileManager")
       .master("local[1]").getOrCreate()
 
     spark.sparkContext.setLogLevel("ERROR")
@@ -116,7 +115,7 @@ tree ../resources/
 |------------------------------------------|---------------------------------------|
 | 33.8x                                    | 1.09x                                 |
 
-*These results show the overall benefits of using Direct Write Checkpointing implementation, and why the upstream s3a based checkpointing is poorly designed to be used with object storage.*
+*These results show the overall benefits of using this CheckpointFileManager, and why the upstream s3a based checkpointing is poorly designed to be used with object storage.*
 
 ## Results (detailed) with each steps
 
