@@ -1,8 +1,15 @@
 # Spark Streaming Checkpoint File Manager for MinIO
 
-This project implements a new [CheckpointFileManager](https://github.com/apache/spark/blob/master/sql/core/src/main/scala/org/apache/spark/sql/execution/streaming/CheckpointFileManager.scala) a different checkpoint logic for MinIO. In this approach, instead of relying on PUT, COPY, DELETE approach of doing renames(), the task writes the checkpoint data directly to the final object it intends to.
-
-Once writing data to the object is complete, the associated output stream is closed. MinIO guarantees that a object is visible only when the output stream is closed. This way the rename operation is avoided, therefore ensuring there is no file listing call while writing data and no consistency issue. Also, it is more efficient as copying the entire content from one object to another object is also avoided.
+This project implements a MinIO native CheckpointFileManager for Apache Spark Structured Streaming. 
+MinIO is a strictly consistent S3-API compatible object store; all object operations are atomic and transactional. 
+This native CheckpointFileManager takes full advantage of the native object APIs and eliminates the Hadoop HCFS 
+emulation layer, which is inefficient and unnecessary on object stores.
+ 
+Since filesystems did not support ACID transactions, applications wrote the files to a temporary location and 
+used atomic renames to mimic the commit operation. Object stores do not have a rename API because the objects 
+do not appear in the namespace until the put or put-multipart transaction is complete. The default CheckpointFileManager 
+shipped with Apache Spark is designed for HCFS and POSIX-based filesystems and it emulates rename API on the object 
+store using PUT-COPY-LIST-DELTE APIs.
 
 ## Sample Code used in testing
 
