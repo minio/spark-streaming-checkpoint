@@ -187,11 +187,13 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
 
     var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
     listVersionsResponse.getVersionSummaries().foreach(s3Version => {
-      s3Client.deleteVersion(
-        s3Version.getBucketName(),
-        s3Version.getKey(),
-        s3Version.getVersionId(),
-      )
+      if (s3Version.getKey() == prefix) {
+        s3Client.deleteVersion(
+          s3Version.getBucketName(),
+          s3Version.getKey(),
+          s3Version.getVersionId(),
+        )
+      }
     })
 
     while (listVersionsResponse.isTruncated()) {
