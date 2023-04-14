@@ -15,6 +15,7 @@ object SparkStreamingFromDirectory {
     spark.sparkContext.hadoopConfiguration.set("fs.s3a.path.style.access", "true")
     spark.sparkContext.hadoopConfiguration.set("fs.s3a.access.key", "minioadmin")
     spark.sparkContext.hadoopConfiguration.set("fs.s3a.secret.key", "minioadmin")
+    spark.sparkContext.hadoopConfiguration.set("fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
 
     val schema = StructType(
       List(
