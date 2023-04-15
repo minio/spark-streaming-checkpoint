@@ -20,9 +20,9 @@ package io.minio.spark.checkpoint
 import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.AmazonS3URI
 import com.amazonaws.services.s3.AmazonS3ClientBuilder
-import com.amazonaws.services.s3.model.VersionListing
-import com.amazonaws.services.s3.model.ListVersionsRequest
-import com.amazonaws.services.s3.model.S3VersionSummary
+import com.amazonaws.services.s3.model.ObjectListing
+import com.amazonaws.services.s3.model.S3ObjectSummary
+import com.amazonaws.services.s3.model.AmazonS3Exception
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import org.apache.spark.sql.execution.streaming.CheckpointFileManager
 import org.apache.spark.sql.errors.QueryExecutionErrors
@@ -71,25 +71,25 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     val bucketName = p.substring(0, objectPos);
     val prefix = p.substring(objectPos + 1);
 
-    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
+    var objectsResponse = s3Client.listObjects(bucketName, prefix)
     var results = ArrayBuffer[FileStatus]()
-    listVersionsResponse.getVersionSummaries().foreach(s3Version => {
-      results += newFile(s3Version)
+    objectsResponse.getObjectSummaries().foreach(s3Object => {
+      results += newFile(s3Object)
     })
 
-    while (listVersionsResponse.isTruncated()) {
-      listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
-      listVersionsResponse.getVersionSummaries().foreach(s3Version => {
-        results += newFile(s3Version)
+    while (objectsResponse.isTruncated()) {
+      objectsResponse = s3Client.listNextBatchOfObjects(objectsResponse)
+      objectsResponse.getObjectSummaries().foreach(s3Object => {
+        results += newFile(s3Object)
       })
     }
 
     results.toArray
   }
 
-  def newFile(version: S3VersionSummary): FileStatus = {
-    new FileStatus(version.getSize(), false, 1, 64 * 1024 * 1024,
-      version.getLastModified().getTime(), new Path(version.getBucketName(), version.getKey()))
+  def newFile(obj: S3ObjectSummary): FileStatus = {
+    new FileStatus(obj.getSize(), false, 1, 64 * 1024 * 1024,
+      obj.getLastModified().getTime(), new Path(obj.getBucketName(), obj.getKey()))
   }
 
   override def mkdirs(path: Path): Unit = {
@@ -168,10 +168,6 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
   }
 
   override def delete(path: Path): Unit = {
-    deleteObjectsInBucket(path)
-  }
-
-  def deleteObjectsInBucket(path: Path): Unit = {
     var p = path.toString().stripPrefix("s3a://").trim
 
     // Remove leading SEPARATOR
@@ -183,30 +179,21 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
 
     val objectPos = p.indexOf(Path.SEPARATOR_CHAR)
     val bucketName = p.substring(0, objectPos)
-    val prefix = p.substring(objectPos + 1)
+    val objectName = p.substring(objectPos + 1)
 
-    var listVersionsResponse = s3Client.listVersions(bucketName, prefix)
-    listVersionsResponse.getVersionSummaries().foreach(s3Version => {
-      if (s3Version.getKey() == prefix) {
-        s3Client.deleteVersion(
-          s3Version.getBucketName(),
-          s3Version.getKey(),
-          s3Version.getVersionId(),
-        )
-      }
-    })
-
-    while (listVersionsResponse.isTruncated()) {
-      listVersionsResponse = s3Client.listNextBatchOfVersions(listVersionsResponse)
-      listVersionsResponse.getVersionSummaries().foreach(s3Version => {
-        if (s3Version.getKey() == prefix) {
-          s3Client.deleteVersion(
-            s3Version.getBucketName(),
-            s3Version.getKey(),
-            s3Version.getVersionId(),
-          )
+    try {
+      val objectMeta = s3Client.getObjectMetadata(bucketName, objectName)
+      // Always delete the latest.
+      s3Client.deleteVersion(
+        bucketName,
+        objectName,
+        objectMeta.getVersionId(),
+      )
+    } catch {
+      case x: AmazonS3Exception =>
+        if (x.getStatusCode() != 404) {
+          throw x
         }
-      })
     }
   }
 
