@@ -167,6 +167,8 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
     s3Client.doesObjectExist(bucketName, objectName)
   }
 
+  def isEmpty(x: String) = x == null || x.trim.isEmpty
+
   override def delete(path: Path): Unit = {
     var p = path.toString().stripPrefix("s3a://").trim
 
@@ -183,12 +185,24 @@ class S3BasedCheckpointFileManager(path: Path, hadoopConfiguration: Configuratio
 
     try {
       val objectMeta = s3Client.getObjectMetadata(bucketName, objectName)
-      // Always delete the latest.
-      s3Client.deleteVersion(
-        bucketName,
-        objectName,
-        objectMeta.getVersionId(),
-      )
+      objectMeta.getVersionId() match {
+        case vid if isEmpty(vid) => {
+          // Always delete the latest for unversioned.
+          s3Client.deleteVersion(
+            bucketName,
+            objectName,
+            "null",
+          )
+        }
+        case vid => {
+          // Always delete the latest.
+          s3Client.deleteVersion(
+            bucketName,
+            objectName,
+            objectMeta.getVersionId(),
+          )
+        }
+      }
     } catch {
       case x: AmazonS3Exception =>
         if (x.getStatusCode() != 404) {
