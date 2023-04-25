@@ -8,7 +8,7 @@ emulation layer, which is inefficient and unnecessary on object stores.
 Since filesystems did not support ACID transactions, applications wrote the files to a temporary location and 
 used atomic renames to mimic the commit operation. Object stores do not have a rename API because the objects 
 do not appear in the namespace until the put or put-multipart transaction is complete. The default CheckpointFileManager 
-shipped with Apache Spark is designed for HCFS and POSIX-based filesystems and it emulates rename API on the object 
+shipped with Apache Spark is designed for HDFS and POSIX-based filesystems and it emulates rename API on the object 
 store using PUT-COPY-LIST-DELTE APIs.
 
 ## Sample Code used in testing
